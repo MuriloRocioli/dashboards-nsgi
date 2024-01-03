@@ -1,51 +1,69 @@
-# Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
+import mysql.connector
+from mysql.connector import Error
+import pandas as pd
 import streamlit as st
-from streamlit.logger import get_logger
 
-LOGGER = get_logger(__name__)
+#Configuração do Banco de Dados
+def create_db_connection(host_name, user_name, user_password, db_name):
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host=host_name,
+            user=user_name,
+            passwd=user_password,
+            database=db_name
+        )
+        print("MySQL Database connection successful")
+    except Error as err:
+        print(f"Error: '{err}'")
 
+    return connection
 
-def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+connection = create_db_connection("192.185.213.59", "forsa432_portal", "Portal2023*", "forsa432_portal")
 
-    st.write("# Welcome to Streamlit! 👋")
+#Consulta do Banco de Dados
+def read_query(connection, query):
+    cursor = connection.cursor()
+    result = None
+    try:
+        cursor.execute(query)
+        result = cursor.fetchall()
+        return result
+    except Error as err:
+        print(f"Error: '{err}'")
 
-    st.sidebar.success("Select a demo above.")
+q1 = """
+SELECT *
+FROM rise_invoice_items;
+"""
+results = read_query(connection, q1)
 
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
+from_db = []
 
+for result in results:
+   result = list(result)
+   from_db.append(result)
 
-if __name__ == "__main__":
-    run()
+columns = ["id", "Tipo de Negócio", "Descrição", "Qtd.", "Unid.", "Montante", "Total", "sort", "invoice_id", "item_id", "taxable", "deleted"]
+df = pd.DataFrame(from_db, columns=columns)
+
+#Configuração da Página
+st.set_page_config(page_title="Dashboards NSGi")
+
+with st.container():
+    st.subheader("Dashboards NSGi")
+    st.title("Dashboard Comercial")
+    st.subheader("Negócios")
+
+with st.container():
+    st.write("---")
+    # Contagem dos negócios por tipo
+    count_by_type = df['Tipo de Negócio'].value_counts()
+
+    # Criando o gráfico de barras usando st.bar_chart
+    st.bar_chart(count_by_type)
+    
+    total_by_type = df.groupby("Tipo de Negócio")["Total"].sum()
+
+    # Criando o gráfico de barras usando st.bar_chart
+    chart = st.bar_chart(total_by_type)
